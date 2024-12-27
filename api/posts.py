@@ -1,34 +1,38 @@
 from datetime import datetime
-from urllib import response
-from flask import Blueprint, json, jsonify, request, Response
-from werkzeug.exceptions import *
+from flask import Blueprint, json, jsonify, request, make_response
+from werkzeug.exceptions import HTTPException
 from . import db
 from api.models import *
+from api.error_handler import APIException
 
 bp = Blueprint('blogging', __name__)
 
 
-@bp.errorhandler(ValueError)
-def handle_value_error(error):
-    response = jsonify({'error': 'operation failed', 'msg': str(error)})
-    response.status_code = 400
-    return response
+def make_response(data=None, message='Operation completed successfully', status='success', status_code=200):
+    response = {
+        'status': status,
+        'message': message,
+        'data': data
+    }
+    return jsonify(response), status_code
 
 
-@bp.errorhandler(KeyError)
-def handle_key_error(error):
-    response = jsonify({'error': 'operation failed',
-                       'msg': 'Missing required keys: ' + str(error)})
-    response.status_code = 400
-    return response
+@bp.errorhandler(APIException)
+def handle_api_error(e):
+    response = e.to_dict()
+    return jsonify(response), e.status_code
 
 
-def make_error_response(status_code, msg, error='Operation Failed') -> HTTPException:
-    response = jsonify({'error': error, 'msg': msg})
-    if status_code == 400:
-        return BadRequest(response=response)
-    elif status_code == 404:
-        return NotFound(response=response)
+def process_tags(article, tags):
+    tag_list = []
+    for tag_name in tags:
+        tag = Tags.query.filter_by(tags=tag_name).first()
+        if not tag:
+            tag = Tags(tags=tag_name)
+            tag_list.append(tag)
+        tag_list.append(tag)
+        db.session.add_all(tag_list)
+    article.tagging.extend(tag_list)
 
 
 @bp.route('/posts', methods=['POST'])
@@ -44,27 +48,20 @@ def create():
                               createdAt=now,
                               updatedAt=now
                               )
+            tags = data['tags']
         except ValueError as e:
             db.session.rollback()
-            return handle_value_error(e)
+            raise APIException(message=str(e), status_code=400)
         except KeyError as e:
             db.session.rollback()
-            return handle_key_error(e)
+            raise APIException(
+                message=f'Missing required key: {e}', status_code=400)
         db.session.add(article)
-
-        tags = data['tags']
-        if not tags:
-            db.session.rollback()
-            raise ValueError('tags is required')
-        for tag_name in tags:
-            tag = Tags.query.filter_by(tags=tag_name).first()
-            if not tag:
-                tag = Tags(tags=tag_name)
-                db.session.add(tag)
-            article.tagging.append(tag)
+        process_tags(article, tags)
         db.session.commit()
-        return jsonify({'msg': 'Operation Successed'}), 201
-    raise make_error_response(400, 'Invalid JSON')
+        return make_response(status_code=201)
+    print("hi")
+    raise APIException(message='Invalid JSON')
 
 
 @bp.route('/posts/<int:id>', methods=['PUT'])
@@ -78,29 +75,18 @@ def update(id):
             article.category = data['category']
             article.updatedAt = datetime.strptime(datetime.now().strftime(
                 "%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
+            tags = data['tags']
         except ValueError as e:
             db.session.rollback()
-            return handle_value_error(e)
+            raise APIException(message=str(e), status_code=400)
         except KeyError as e:
             db.session.rollback()
-            return handle_key_error(e)
-
-        tags = data['tags']
-        if not tags:
-            db.session.rollback()
-            raise ValueError('tags is required')
-
-        article.tagging.clear()
-        for tag_name in tags:
-            tag = Tags.query.filter_by(tags=tag_name).first()
-            if not tag:
-                tag = Tags(tags=tag_name)
-                db.session.add(tag)
-            if tag not in article.tagging:
-                article.tagging.append(tag)
+            raise APIException(
+                message=f'Missing required key: {e}', status_code=400)
+        process_tags(article, tags)
         db.session.commit()
-        return jsonify({'msg': 'Operation Successed'}), 200
-    raise make_error_response(404, 'Post Not Found')
+        return make_response(status_code=200)
+    raise APIException(message='Post Not Found')
 
 
 @bp.route('/posts', methods=['GET'])
@@ -109,15 +95,13 @@ def get(id=None):
     if id:
         article = Article.query.filter_by(_id=id).first()
         if not article:
-            raise make_error_response(404, 'Post Not Found')
-        response = json.dumps(
-            article.to_dict(), sort_keys=False)
-        return Response(response, mimetype='application/json')
+            raise APIException(message='Post Not Found')
+        data = article.to_dict()
+        return make_response(data=data)
 
     articles = Article.query.all()
-    response = json.dumps([article.to_dict()
-                          for article in articles], sort_keys=False)
-    return Response(response, mimetype='application/json')
+    data = [article.to_dict() for article in articles]
+    return make_response(data=data)
 
 
 @bp.route('/posts/<int:id>', methods=['DELETE'])
@@ -126,5 +110,5 @@ def delete(id=None):
     if article:
         db.session.delete(article)
         db.session.commit()
-        return ('', 204)
-    return make_error_response(404, 'Post Not Found')
+        return make_response(status_code=204)
+    raise APIException(message='Post Not Found')

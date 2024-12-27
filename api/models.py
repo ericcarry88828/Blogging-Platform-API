@@ -19,10 +19,10 @@ class Article(db.Model):
     tagging = db.relationship(
         "Tags", secondary=art_tag_relations, backref='article')
 
-    @validates('title', 'content', 'category', 'createdAt', 'updatedAt')
+    @validates('title', 'content', 'category')
     def required_fields(self, key, value):
-        if not value:
-            raise ValueError(f'{key} is required')
+        if len(value) == 0:
+            raise ValueError('Value cannot be empty')
 
         if key == 'title' and len(value) > 50:
             raise ValueError(f'{key} must be less than 50 characters')
@@ -49,6 +49,8 @@ class Tags(db.Model):
 
     @validates('tags')
     def required_fields(self, key, value):
+        if len(value) == 0:
+            raise ValueError('Value cannot be empty')
         if key == 'tags' and len(value) > 15:
             raise ValueError(f'{key} must be less than 15 characters')
         return value
