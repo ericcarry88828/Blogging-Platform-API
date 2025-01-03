@@ -1,3 +1,4 @@
+[![Project Page](https://img.shields.io/badge/Project%20Page-Click%20Here-brightgreen)](https://roadmap.sh/projects/blogging-platform-api)
 # Blogging Platform API
 
 ![Blogging Platform API](https://assets.roadmap.sh/guest/blogging-platform-api.png)
