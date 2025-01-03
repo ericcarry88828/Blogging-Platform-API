@@ -22,7 +22,7 @@ class Article(db.Model):
     @validates('title', 'content', 'category')
     def required_fields(self, key, value):
         if len(value) == 0:
-            raise ValueError('Value cannot be empty')
+            raise ValueError(f'{key} cannot be empty')
 
         if key == 'title' and len(value) > 50:
             raise ValueError(f'{key} must be less than 50 characters')
@@ -49,8 +49,6 @@ class Tags(db.Model):
 
     @validates('tags')
     def required_fields(self, key, value):
-        if len(value) == 0:
-            raise ValueError('Value cannot be empty')
-        if key == 'tags' and len(value) > 15:
-            raise ValueError(f'{key} must be less than 15 characters')
+        if key == 'tags' and len(value) > 10:
+            raise ValueError(f'{key} must be less than 10 characters')
         return value

@@ -1,8 +1,6 @@
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
-from api.error_handler import APIException
-
 db = SQLAlchemy()
 
 
@@ -19,8 +17,8 @@ def create_app():
     from . import posts
     app.register_blueprint(posts.bp)
 
-    # @app.errorhandler(405)
-    # def method_not_allow(e):
-    #     return jsonify({'error': 'Method not Allowed', 'message': 'Please use correct method to access this endpoint.'})
+    @app.errorhandler(405)
+    def method_not_allow(e):
+        return jsonify({'status': 'error', 'message': 'please use correct method to access this endpoint.', 'error': 'method not allowed'})
 
     return app

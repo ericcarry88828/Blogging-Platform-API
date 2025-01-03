@@ -1,6 +1,5 @@
 from datetime import datetime
-from flask import Blueprint, json, jsonify, request, make_response
-from werkzeug.exceptions import HTTPException
+from flask import Blueprint, jsonify, request, make_response
 from . import db
 from api.models import *
 from api.error_handler import APIException
@@ -8,7 +7,7 @@ from api.error_handler import APIException
 bp = Blueprint('blogging', __name__)
 
 
-def make_response(data=None, message='Operation completed successfully', status='success', status_code=200):
+def make_response(data=None, message='operation completed successfully', status='success', status_code=200):
     response = {
         'status': status,
         'message': message,
@@ -24,14 +23,21 @@ def handle_api_error(e):
 
 
 def process_tags(article, tags):
+    if not tags:
+        raise APIException(message='tags cannot be empty')
+
     tag_list = []
-    for tag_name in tags:
-        tag = Tags.query.filter_by(tags=tag_name).first()
-        if not tag:
-            tag = Tags(tags=tag_name)
-            tag_list.append(tag)
-        tag_list.append(tag)
+    if isinstance(tags, list):
+        for tag_name in tags:
+            tag = Tags.query.filter_by(tags=tag_name).first()
+            if not tag:
+                tag = Tags(tags=tag_name)
+                tag_list.append(tag)
+            else:
+                tag_list.append(tag)
         db.session.add_all(tag_list)
+    else:
+        raise APIException(message='invalid tags format')
     article.tagging.extend(tag_list)
 
 
@@ -55,38 +61,39 @@ def create():
         except KeyError as e:
             db.session.rollback()
             raise APIException(
-                message=f'Missing required key: {e}', status_code=400)
+                message=f'missing required key: {e}', status_code=400)
         db.session.add(article)
         process_tags(article, tags)
         db.session.commit()
         return make_response(status_code=201)
-    print("hi")
-    raise APIException(message='Invalid JSON')
+    raise APIException(message='invalid JSON')
 
 
 @bp.route('/posts/<int:id>', methods=['PUT'])
 def update(id):
     article = Article.query.filter_by(_id=id).first()
     if article:
-        try:
-            data = request.get_json()
-            article.title = data['title']
-            article.content = data['content']
-            article.category = data['category']
-            article.updatedAt = datetime.strptime(datetime.now().strftime(
-                "%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
-            tags = data['tags']
-        except ValueError as e:
-            db.session.rollback()
-            raise APIException(message=str(e), status_code=400)
-        except KeyError as e:
-            db.session.rollback()
-            raise APIException(
-                message=f'Missing required key: {e}', status_code=400)
-        process_tags(article, tags)
-        db.session.commit()
-        return make_response(status_code=200)
-    raise APIException(message='Post Not Found')
+        if request.is_json:
+            try:
+                data = request.get_json()
+                article.title = data['title']
+                article.content = data['content']
+                article.category = data['category']
+                article.updatedAt = datetime.strptime(datetime.now().strftime(
+                    "%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
+                tags = data['tags']
+            except ValueError as e:
+                db.session.rollback()
+                raise APIException(message=str(e), status_code=400)
+            except KeyError as e:
+                db.session.rollback()
+                raise APIException(
+                    message=f'missing required key: {e}', status_code=400)
+            process_tags(article, tags)
+            db.session.commit()
+            return make_response(status_code=200)
+        raise APIException(message='invalid JSON')
+    raise APIException(message='post not found')
 
 
 @bp.route('/posts', methods=['GET'])
@@ -95,7 +102,7 @@ def get(id=None):
     if id:
         article = Article.query.filter_by(_id=id).first()
         if not article:
-            raise APIException(message='Post Not Found')
+            raise APIException(message='post not found')
         data = article.to_dict()
         return make_response(data=data)
 
@@ -111,4 +118,4 @@ def delete(id=None):
         db.session.delete(article)
         db.session.commit()
         return make_response(status_code=204)
-    raise APIException(message='Post Not Found')
+    raise APIException(message='post not found')
