@@ -5,7 +5,7 @@
 
 This project implements a RESTful API with basic CRUD operations for a personal blogging platform. It is written in Python using [Flask](https://flask.palletsprojects.com/en/stable/) to provide the REST interface and and uses [flask-sqlalchemy](https://flask-sqlalchemy.readthedocs.io/en/stable/) and [pymysql](https://pymysql.readthedocs.io/en/latest/) to operate mysql
 
-NOTE: This project does not implement a frontend client. The backend web service sends/recieves posts in JSON form. 
+NOTE: This project does not implement a frontend client. The backend web service sends/receives posts in JSON form. 
 
 ## Goals
 The goals of this project are to:
